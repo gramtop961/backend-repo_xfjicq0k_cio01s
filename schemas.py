@@ -1,48 +1,45 @@
 """
-Database Schemas
+Database Schemas for SiMATA (Sistem Informasi Manajemen Aset & Tata Kelola)
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
+Each Pydantic model represents a MongoDB collection. The collection name is the
+lowercase of the class name.
 
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Default collections:
+- AssetCategory -> "assetcategory"
+- Location -> "location"
+- Department -> "department"
+- Asset -> "asset"
 """
 
 from pydantic import BaseModel, Field
 from typing import Optional
+from datetime import date
 
-# Example schemas (replace with your own):
 
-class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+class AssetCategory(BaseModel):
+    name: str = Field(..., description="Nama kategori aset")
+    description: Optional[str] = Field(None, description="Deskripsi kategori")
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
 
-# Add your own schemas here:
-# --------------------------------------------------
+class Location(BaseModel):
+    name: str = Field(..., description="Nama lokasi/ruangan")
+    address: Optional[str] = Field(None, description="Alamat lokasi")
+    floor: Optional[str] = Field(None, description="Lantai/ruang detail")
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+
+class Department(BaseModel):
+    name: str = Field(..., description="Nama Bagian/Bidang")
+    contact_person: Optional[str] = Field(None, description="Kontak penanggung jawab")
+
+
+class Asset(BaseModel):
+    code: str = Field(..., description="Kode inventaris/nomor register unik")
+    name: str = Field(..., description="Nama aset")
+    category_id: str = Field(..., description="ID kategori aset")
+    location_id: str = Field(..., description="ID lokasi aset")
+    department_id: Optional[str] = Field(None, description="ID bagian/bidang pemilik")
+    status: str = Field("aktif", description="Status aset: aktif, perbaikan, rusak, dihapus")
+    condition: str = Field("baik", description="Kondisi aset: baru, baik, sedang, rusak")
+    purchase_date: Optional[date] = Field(None, description="Tanggal perolehan")
+    value: Optional[float] = Field(None, ge=0, description="Nilai perolehan (Rp)")
+    description: Optional[str] = Field(None, description="Keterangan tambahan")

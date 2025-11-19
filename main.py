@@ -1,8 +1,12 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional, Any
 
-app = FastAPI()
+from database import db, create_document, get_documents
+
+app = FastAPI(title="SiMATA - Sistem Informasi Manajemen Aset & Tata Kelola")
 
 app.add_middleware(
     CORSMiddleware,
@@ -12,17 +16,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+class CreateRequest(BaseModel):
+    collection: str
+    data: dict
+
+
 @app.get("/")
 def read_root():
-    return {"message": "Hello from FastAPI Backend!"}
+    return {"name": "SiMATA", "version": "0.1", "message": "Backend berjalan"}
 
-@app.get("/api/hello")
-def hello():
-    return {"message": "Hello from the backend API!"}
 
 @app.get("/test")
 def test_database():
-    """Test endpoint to check if database is available and accessible"""
     response = {
         "backend": "✅ Running",
         "database": "❌ Not Available",
@@ -31,38 +37,60 @@ def test_database():
         "connection_status": "Not Connected",
         "collections": []
     }
-    
+
     try:
-        # Try to import database module
-        from database import db
-        
         if db is not None:
             response["database"] = "✅ Available"
-            response["database_url"] = "✅ Configured"
-            response["database_name"] = db.name if hasattr(db, 'name') else "✅ Connected"
+            response["database_url"] = "✅ Set" if os.getenv("DATABASE_URL") else "❌ Not Set"
+            response["database_name"] = os.getenv("DATABASE_NAME") or "❌ Not Set"
             response["connection_status"] = "Connected"
-            
-            # Try to list collections to verify connectivity
             try:
                 collections = db.list_collection_names()
-                response["collections"] = collections[:10]  # Show first 10 collections
+                response["collections"] = collections[:10]
                 response["database"] = "✅ Connected & Working"
             except Exception as e:
-                response["database"] = f"⚠️  Connected but Error: {str(e)[:50]}"
+                response["database"] = f"⚠️  Connected but Error: {str(e)[:80]}"
         else:
             response["database"] = "⚠️  Available but not initialized"
-            
-    except ImportError:
-        response["database"] = "❌ Database module not found (run enable-database first)"
+
     except Exception as e:
-        response["database"] = f"❌ Error: {str(e)[:50]}"
-    
-    # Check environment variables
-    import os
-    response["database_url"] = "✅ Set" if os.getenv("DATABASE_URL") else "❌ Not Set"
-    response["database_name"] = "✅ Set" if os.getenv("DATABASE_NAME") else "❌ Not Set"
-    
+        response["database"] = f"❌ Error: {str(e)[:80]}"
+
     return response
+
+
+@app.get("/api/collections")
+def list_collections():
+    try:
+        cols = db.list_collection_names() if db else []
+        return {"collections": cols}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/create")
+def create_generic(payload: CreateRequest):
+    try:
+        inserted_id = create_document(payload.collection, payload.data)
+        return {"inserted_id": inserted_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/list/{collection}")
+def list_generic(collection: str, limit: Optional[int] = 50):
+    try:
+        docs = get_documents(collection, limit=limit)
+        # Convert ObjectId to string if present
+        result: List[Any] = []
+        for d in docs:
+            d = dict(d)
+            if "_id" in d:
+                d["_id"] = str(d["_id"])
+            result.append(d)
+        return {"items": result}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 if __name__ == "__main__":
